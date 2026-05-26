@@ -1,12 +1,13 @@
 export type RootStackParamList = {
     Home: undefined;
     CategoryDetail: {
-    category: {
-      cat: string;
-      amount: number;
+        categoryName: string;
+        items?: ExpenseItem[];
+        selectedDate: string;
+        onAddItem?: (name: string, amount: number, date?: string) => void;
+        totalBalance?: number;
     };
-  };
-}
+};
 
 export type ExpenseItem = {
     name: string;

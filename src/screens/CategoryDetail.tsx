@@ -1,82 +1,68 @@
-import { RouteProp, useRoute } from '@react-navigation/native';
-import { RootStackParamList, CategoryType, ExpenseItem } from '../routes/types';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Button, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Plus, ArrowLeft } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { filterItemsByDate } from '../utils/dateFilter';
-import DateScroller from '../components/DateScroller';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 
-type RouteParams = {
-    categoryName: string;
-    items: ExpenseItem[];
-    selectedDate: string;
-    onAddItem: (name: string, amount: number) => void;
-    totalBalance: number;
-};
+import DateScroller from '../components/DateScroller';
+import ExpenseModal from '../components/ExpenseModal';
+import { useExpenses } from '../context/ExpenseContext';
+import { RootStackParamList } from '../routes/types';
+import { filterItemsByDate } from '../utils/dateFilter';
+
+type CategoryDetailRouteProp = RouteProp<RootStackParamList, 'CategoryDetail'>;
 
 const CategoryDetail = () => {
     const navigation = useNavigation();
-    const route = useRoute<RouteProp<{ CategoryDetail: RouteParams }, 'CategoryDetail'>>();
-    const { categoryName, items = [], selectedDate, onAddItem, totalBalance = 0 } = route.params;
+    const route = useRoute<CategoryDetailRouteProp>();
+    const { categoryName, selectedDate } = route.params;
+
+    const {
+        categories,
+        total,
+        categoriesList,
+        addExpense
+    } = useExpenses();
 
     const [modalVisible, setModalVisible] = useState(false);
     const [name, setName] = useState("");
     const [amount, setAmount] = useState("");
-    const [localItems, setLocalItems] = useState(items);
+    const [currentDate, setCurrentDate] = useState(selectedDate);
 
-    const [currentDate, setCurrentDate] =
-        useState(selectedDate);
+    // Dynamic resolution of category data from global context
+    const categoryData = categories.find(c => c.cat === categoryName);
+    const items = categoryData?.items ?? [];
 
-    const filteredItems = filterItemsByDate(
-        localItems,
-        currentDate
-    );
+    const filteredItems = filterItemsByDate(items, currentDate);
+    const categoryTotal = filteredItems.reduce((sum, item) => sum + item.amount, 0);
 
-    // const categoryTotal = items.reduce((sum, item) => sum + item.amount, 0);
-    // const categoryTotal = localItems.reduce((sum, item) => sum + item.amount, 0);
-    const categoryTotal = filteredItems.reduce(
-        (sum, item) => sum + item.amount,
-        0
-    );
     const handleSave = () => {
         const amt = parseFloat(amount);
         if (!name.trim() || isNaN(amt) || amt <= 0) return;
-        const newItem = {
-            name: name.trim(),
-            amount: amt,
-            //    date: new Date().toLocaleDateString(),
-            date: currentDate,
-        };
 
-        setLocalItems(prev => [...prev, newItem]);
-        onAddItem(name.trim(), amt);
+        addExpense(categoryName, name.trim(), amt, currentDate);
         setName("");
         setAmount("");
         setModalVisible(false);
     };
 
     return (
-        // <SafeAreaView style={{ flex: 1, backgroundColor: "#3C3C3C" }}>
         <View style={{ flex: 1, backgroundColor: "#3C3C3C" }}>
-            <View style={{ paddingHorizontal: 20, paddingBottom:10 }}>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
                 <DateScroller
                     selectedDate={currentDate}
                     setSelectedDate={setCurrentDate}
                 />
             </View>
 
-            <View style={{ flex: 1, paddingHorizontal: 20, paddingBottom:20, marginBottom: 60, }}>
+            <View style={{ flex: 1, paddingHorizontal: 20, paddingBottom: 20, marginBottom: 60 }}>
                 <View style={{ backgroundColor: "#4E4E4E", paddingHorizontal: 30, paddingVertical: 10, borderRadius: 40, alignItems: "flex-end" }}>
                     <View>
                         <Text style={{ color: "white", fontSize: 20, fontWeight: "600" }}>Balance</Text>
-                        <Text style={{ color: "white", fontSize: 25, fontWeight: "900" }}>${totalBalance}</Text>
+                        <Text style={{ color: "white", fontSize: 25, fontWeight: "900" }}>${total}</Text>
                     </View>
                 </View>
 
                 <View style={{ backgroundColor: "#4E4E4E", borderRadius: 20, paddingHorizontal: 20, marginTop: 90, flex: 1 }}>
-
                     <View style={{ flexDirection: "row", alignItems: "center", marginTop: 30, marginBottom: 10 }}>
                         <TouchableOpacity onPress={() => navigation.goBack()}>
                             <ArrowLeft color="white" size={22} />
@@ -115,39 +101,20 @@ const CategoryDetail = () => {
                 <Plus onPress={() => setModalVisible(true)} size={30} color="white" />
             </View>
 
-            {modalVisible && (
-                <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" }}>
-                    <View style={{ width: "85%", backgroundColor: "#2C2C2C", borderRadius: 20, padding: 20 }}>
-
-                        <Text style={{ color: "white", fontSize: 20, marginBottom: 15 }}>
-                            Add Expense to {categoryName}
-                        </Text>
-
-                        <TextInput
-                            placeholder="Expense name"
-                            value={name}
-                            onChangeText={setName}
-                            placeholderTextColor="#aaa"
-                            style={{ backgroundColor: "#4E4E4E", borderRadius: 10, padding: 12, color: "white", marginBottom: 10 }}
-                        />
-
-                        <TextInput
-                            placeholder="Enter amount"
-                            value={amount}
-                            onChangeText={setAmount}
-                            keyboardType="numeric"
-                            placeholderTextColor="#aaa"
-                            style={{ backgroundColor: "#4E4E4E", borderRadius: 10, padding: 12, color: "white", marginBottom: 20 }}
-                        />
-
-                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                            <Button title="Cancel" onPress={() => setModalVisible(false)} />
-                            <Button title="Save" onPress={handleSave} />
-                        </View>
-                    </View>
-                </View>
-            )}
-            {/* </SafeAreaView> */}
+            <ExpenseModal
+                visible={modalVisible}
+                selectedCategory={categoryName}
+                setSelectedCategory={() => {}}
+                categoriesList={categoriesList}
+                name={name}
+                setName={setName}
+                amount={amount}
+                setAmount={setAmount}
+                onCancel={() => setModalVisible(false)}
+                onSave={handleSave}
+                showCategoryPicker={false}
+                categoryName={categoryName}
+            />
         </View>
     );
 };
